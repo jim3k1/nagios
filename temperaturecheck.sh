@@ -44,8 +44,6 @@ function usage {
 # Variables #
 #############
 
-#warningtemp=120
-#crittemp=0
 me=$(basename "$0")
 
 while getopts “c:w:h:” OPTION
