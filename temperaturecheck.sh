@@ -40,11 +40,19 @@ function usage {
 	exit $STATE_UNKNOWN
 }
 
+function debug { # function to enable debug 
+	if [ "$debugon" == "yes" ]; then
+		$@
+	fi
+}
+
 #############
 # Variables #
 #############
 
+debugon=no
 me=$(basename "$0")
+hardware_identifier=$(/usr/bin/sensors | head -1)
 
 while getopts “c:w:h:” OPTION
 do
@@ -86,16 +94,46 @@ if (( "$warningtemp" >= "$crittemp" )); then
        exit $STATE_UNKNOWN
 fi
 
+# different hardware types give different outputs to /usr/bin/sensors
+# need a way to figure out which we are working with here
+# intel seems a uniform output, AMD can have 2 possible examples on tested equipment.
+
+if [ "$hardware_identifier" == "acpitz-virtual-0" ]; then
+	processor=INTEL
+elif [ "$hardware_identifier" == "fam15h_power-pci-00c4" ]; then
+	processor=AMD
+elif [ "$hardware_identifier" == "k10temp-pci-00c3" ]; then
+	processor=AMD
+else
+	echo "Error: cannot determine hardware sensor and what to search the /usr/bin/sensors output for to find the temperature"
+	exit $STATE_UNKNOWN
+fi
+
 ############################
 # Detect Core temperatures #
 ############################
 
-temperatures=($(/usr/bin/sensors | grep 'Core' | awk '{print $3}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//'))
-# assumes sensors command outputs 'Core'
-# takes the 3rd charset of it and mangles it through sed 
+if [ "$processor" == "INTEL" ]; then
+	temperatures=($(/usr/bin/sensors | grep 'Core' | awk '{print $3}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//'))
+elif [ "$processor" == "AMD" ]; then
+	temperatures=$(/usr/bin/sensors | grep 'temp1' | awk '{print $2}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//')
+fi
+
+if [ -z "$temperatures" ]; then
+	echo "Error: temperature readings are null"
+	exit $STATE_UNKNOWN
+fi
+
+# sensors temperature outputs are different across the differing hardware types too
+# assumes sensors command outputs 'Core' (INTEL) or 'temp1' (AMD)
+# takes the 3rd charset of it for INTEL and 2nd charset for AMD and mangles through sed 
 # to turn it into a whole number instead of something like +38.0°C
 # by removing the first char which is a + on systems I've tested, then
 # removing any chars ater a '.'
+
+#############################################################
+# Check temperatures against thresholds and act accordingly #
+#############################################################
 
 for coretemp in "${temperatures[@]}"; do
 	if [ $((coretemp)) -gt $((crittemp)) ]; then
