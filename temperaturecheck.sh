@@ -15,7 +15,7 @@ if [ -x "${UTILS}" ]; then
         . "${UTILS}"
 else   
         echo "ERROR: Cannot find ${UTILS}"
-        exit 3
+        exit $STATE_UNKNOWN
 fi
 
 #############
@@ -37,7 +37,7 @@ function critical {
 function usage {
 	echo "$me - nagios monitoring of temperature using lm-utils"
 	echo "$me -w warning temperature -c critical temperature [both flags are mandatory]"
-	exit 3
+	exit $STATE_UNKNOWN
 }
 
 #############
@@ -83,6 +83,11 @@ if [ -z "$crittemp" ]; then
 	usage
 fi
 
+if (( "$warningtemp" >= "$crittemp" )); then
+       echo "The warning temperature threshold: $warningtemp is greater than or equal to the critical temperature: $crittemp threshold. That makes no sense"
+       exit $STATE_UNKNOWN
+fi
+
 ############################
 # Detect Core temperatures #
 ############################
@@ -102,4 +107,5 @@ for coretemp in "${temperatures[@]}"; do
 	fi
 done
 
-exit 0
+echo "OK - Temperatures: ${temperatures[@]}"
+exit $STATE_OK
