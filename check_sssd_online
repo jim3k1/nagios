@@ -1,0 +1,25 @@
+#!/bin/bash
+# check that sssd can connect to active directory
+# in light of an instance where sssd went offline because of the machine/AD trust relationship breaking
+
+# nagios setup
+UTILS=/usr/lib64/nagios/plugins/utils.sh
+if [ -x "${UTILS}" ]; then
+        . "${UTILS}"
+else   
+        echo "ERROR: Cannot find ${UTILS}"
+        exit $STATE_UNKNOWN
+fi
+
+host=$(hostname -f)
+domain="$1"
+online_check=$(sssctl domain-status -o $domain | grep status | awk '{print $3}')
+
+if [ "$online_check" != "Online" ]; then
+        echo "$host Active Directory connection appears to be offline (sssd)"
+        exit $STATE_CRITICAL
+fi
+
+echo "OK - $host AD online"
+
+exit $STATE_OK
