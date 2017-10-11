@@ -11,15 +11,15 @@ else
         exit $STATE_UNKNOWN
 fi
 
-host=$(hostname -f)
+host=$(/usr/bin/hostname -s)
 domain="$1"
-online_check=$(sssctl domain-status -o $domain | grep status | awk '{print $3}')
+online_check=$(/usr/sbin/sssctl domain-status -o $domain | grep status | awk '{print $3}')
 
 if [ "$online_check" != "Online" ]; then
-        echo "$host Active Directory connection appears to be offline (sssd)"
+        echo "PROBLEM - $host - $domain - $online_check (sssd/AD)"
         exit $STATE_CRITICAL
 fi
 
-echo "OK - $host AD online"
+echo "OK - $host $domain $online_check (sssd/AD)"
 
 exit $STATE_OK
