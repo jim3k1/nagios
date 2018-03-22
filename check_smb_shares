@@ -1,0 +1,71 @@
+#!/bin/bash
+# monitor samba / smb shares
+# sourced in part from http://www.revpol.com/xymon_samba_script
+# assumes there are a defined number of shares
+# that should be accessible which means smb is working as expected
+
+# nagios setup
+UTILS=/usr/lib64/nagios/plugins/utils.sh
+if [ -x "${UTILS}" ]; then
+        . "${UTILS}"
+else   
+        echo "ERROR: Cannot find ${UTILS}"
+        exit $STATE_UNKNOWN
+fi
+
+script=$(basename $0)
+
+function debug { # function to enable debug 
+	if [ "$debugon" == "yes" ]; then
+		$@
+	fi
+}
+
+function usage {
+	echo "$script -e [N] -d"
+	echo "-e is mandatory, it requires a number for the amount of expected shares to be accessible"
+	echo "-d enables debug mode"
+}
+
+# get the flags
+while getopts “e:d” OPTION
+do
+	case $OPTION in
+		 d)
+			 debugon="yes"
+			 ;;
+		 e)
+			 expectedavailableshares=$OPTARG
+			 ;;
+		 ?)
+			 usage
+			 exit
+			 ;;
+	 esac
+done
+
+if [ -z "$expectedavailableshares" ]; then
+	usage
+	exit
+fi
+
+host=$(/usr/bin/hostname -s)
+totalopenedshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | wc -l)
+availableshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq | wc -l)
+totalopenfiles=$(smbstatus -L | grep ^[0-9] | wc -l)
+
+debug echo "host = $host | expectedavailableshares = $expectedavailableshares | availableshares = $availableshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
+debug echo ""
+debug echo "the available shares are:"
+debug smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq
+debug echo ""
+
+if [ "$availableshares" != "$expectedavailableshares" ]; then
+	echo "PROBLEM - SMB on $host has $availableshares available samba shares but $expectedavailableshares are expected"
+	echo "See https://wiki.tchpc.tcd.ie/doku.php?id=tilda-s02-setup"
+	exit $STATE_CRITICAL
+fi
+
+echo "OK - SMB on $host has $availableshares samba shares available"
+
+exit $STATE_OK
