@@ -23,8 +23,8 @@ function debug { # function to enable debug
 
 function usage {
 	echo "$script -e [N] -d"
-	echo "-e is mandatory, it requires a number for the amount of expected shares to be accessible"
-	echo "-d enables debug mode"
+	echo "-e (optional) it requires a number for the amount of expected shares to be accessible"
+	echo "-d (optional) enables debug mode"
 }
 
 # get the flags
@@ -44,28 +44,40 @@ do
 	 esac
 done
 
-if [ -z "$expectedavailableshares" ]; then
-	usage
-	exit
-fi
+#if [ -z "$expectedavailableshares" ]; then
+#	usage
+#	exit
+#fi
 
+# most of these variables can be ignored
 host=$(/usr/bin/hostname -s)
 totalopenedshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | wc -l)
 availableshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq | wc -l)
+visibleshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq)
 totalopenfiles=$(smbstatus -L | grep ^[0-9] | wc -l)
+# following 2 are the ones that are compared and thus used:
+tildasharecheck=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq | grep Tilda)
+tildasharecheckexpectedoutput="Tilda"
 
 debug echo "host = $host | expectedavailableshares = $expectedavailableshares | availableshares = $availableshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
 debug echo ""
 debug echo "the available shares are:"
+debug echo "visible shares"
+debug echo "$visibleshares"
+debug echo ""
+debug echo "tildasharecheck variable output:"
+debug echo "$tildasharecheck"
+debug echo ""
+debug echo "smbstatus output:"
 debug smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq
 debug echo ""
 
-if [ "$availableshares" != "$expectedavailableshares" ]; then
-	echo "PROBLEM - SMB on $host has $availableshares available samba shares but $expectedavailableshares are expected"
+if [ "$tildasharecheck" != "$tildasharecheckexpectedoutput" ]; then
+	echo "PROBLEM - SMB on $host has the ("$visibleshares") samba shares available but the ($tildasharecheckexpectedoutput) share is expected and not present"
 	echo "See https://wiki.tchpc.tcd.ie/doku.php?id=tilda-s02-setup"
 	exit $STATE_CRITICAL
 fi
 
-echo "OK - SMB on $host has $availableshares samba shares available"
+echo "OK - SMB on $host has ("$visibleshares") samba shares available, including the ($tildasharecheckexpectedoutput) share as required by this check"
 
 exit $STATE_OK
