@@ -56,26 +56,28 @@ availableshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | c
 visibleshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq)
 totalopenfiles=$(smbstatus -L | grep ^[0-9] | wc -l)
 sharecheck=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq | grep "$expectedavailableshare")
+joinstat=$(net ads testjoin)
 
-debug echo "host = $host | expectedavailableshare = $expectedavailableshare | sharecheck = $sharecheck  | availableshares = $availableshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
-debug echo ""
-debug echo "the available shares are:"
-debug echo "visible shares"
-debug echo "$visibleshares"
-debug echo ""
-debug echo "sharecheck variable output:"
-debug echo "$sharecheck"
-debug echo ""
+debug echo "domain join status = $joinstat | host = $host | expectedavailableshare = $expectedavailableshare | sharecheck = $sharecheck  | availableshares = $availableshares  | visible shares: $visibleshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
 debug echo "smbstatus output:"
 debug smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq
 debug echo ""
 
+if [ "$joinstat" != "Join is OK" ]; then 
+	echo "PROBLEM - net test join problem"
+	exitstate="$STATE_CRITICAL"
+fi
+
 if [ "$sharecheck" != "$expectedavailableshare" ]; then
 	echo "PROBLEM - SMB on $host has the ("$visibleshares") samba shares available but the ($expectedavailableshare) share is expected and not present"
 	echo "See https://wiki.tchpc.tcd.ie/doku.php?id=tilda-s02-setup"
+	exitstate="$STATE_CRITICAL"
+fi
+
+if [ "$exitstate" == "$STATE_CRITICAL" ]; then
 	exit $STATE_CRITICAL
 fi
 
-echo "OK - SMB on $host has ("$visibleshares") samba shares available, including the ($expectedavailableshare) share as required by this check"
+echo "OK - Domain Join on $host appears OK and SMB has ("$visibleshares") samba shares available, including the ($expectedavailableshare) share as required by this check"
 
 exit $STATE_OK
