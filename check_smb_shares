@@ -22,17 +22,21 @@ function debug { # function to enable debug
 }
 
 function usage {
-	echo "$script -e [N] -d"
+	echo "$script -e [Share] -d [Domain] -v"
 	echo "-e (mandatory) requires a value for a share to check to ensure it is present"
-	echo "-d (optional) enables debug mode"
+	echo "-d (mandatory) requires a value for a domain to check is online"
+	echo "-v (optional) enables debug mode"
 }
 
 # get the flags
-while getopts “e:d” OPTION
+while getopts “e:d:v” OPTION
 do
 	case $OPTION in
-		 d)
+		 v)
 			 debugon="yes"
+			 ;;
+		 d)
+			 domain=$OPTARG
 			 ;;
 		 e)
 			 expectedavailableshare=$OPTARG
@@ -48,6 +52,10 @@ if [ -z "$expectedavailableshare" ]; then
 	usage
 	exit
 fi
+if [ -z "$domain" ]; then
+	usage
+	exit
+fi
 
 # most of these variables can be ignored
 host=$(/usr/bin/hostname -s)
@@ -56,15 +64,24 @@ availableshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | c
 visibleshares=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq)
 totalopenfiles=$(smbstatus -L | grep ^[0-9] | wc -l)
 sharecheck=$(smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq | grep "$expectedavailableshare")
-joinstat=$(net ads testjoin)
+#joinstat=$(net ads testjoin) 
+## `--> 20180425 - this 'Cannot read password' and is failing, other checks OK, so working around this for now
+onlinecheck=$(wbinfo --online-status | grep $domain | awk '{print $3}')
+secretcheck=$(wbinfo --check-secret | awk '{print $NF}')
 
-debug echo "domain join status = $joinstat | host = $host | expectedavailableshare = $expectedavailableshare | sharecheck = $sharecheck  | availableshares = $availableshares  | visible shares: $visibleshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
+debug echo "onlinecheck = $onlinecheck | secretcheck = $secretcheck | domain join status = $joinstat | host = $host | expectedavailableshare = $expectedavailableshare | sharecheck = $sharecheck  | availableshares = $availableshares  | visible shares: $visibleshares | totalopenedshares = $totalopenedshares | totalopenfiles = $totalopenfiles"
 debug echo "smbstatus output:"
 debug smbstatus -S | grep -v "^-\|^$\|Connected at\|^IPC" | sort | cut -d' ' -f1 | uniq
 debug echo ""
 
-if [ "$joinstat" != "Join is OK" ]; then 
-	echo "PROBLEM - net test join problem"
+#if [ "$joinstat" != "Join is OK" ]; then 
+if [ "$secretcheck" != "succeeded" ]; then 
+	echo "PROBLEM - problem checking the trust secret for domain"
+	exitstate="$STATE_CRITICAL"
+fi
+
+if [ "$onlinecheck" != "online" ]; then 
+	echo "PROBLEM - problem checking the online status for the domain"
 	exitstate="$STATE_CRITICAL"
 fi
 
