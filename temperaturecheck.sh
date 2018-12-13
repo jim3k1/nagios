@@ -13,7 +13,7 @@ UTILS=/usr/local/nagios/libexec/utils.sh
 # load states and strings
 if [ -x "${UTILS}" ]; then
         . "${UTILS}"
-else   
+else
         echo "ERROR: Cannot find ${UTILS}"
         exit $STATE_UNKNOWN
 fi
@@ -40,7 +40,7 @@ function usage {
 	exit $STATE_UNKNOWN
 }
 
-function debug { # function to enable debug 
+function debug { # function to enable debug
 	if [ "$debugon" == "yes" ]; then
 		$@
 	fi
@@ -104,6 +104,8 @@ elif [ "$hardware_identifier" == "fam15h_power-pci-00c4" ]; then
 	processor=AMD
 elif [ "$hardware_identifier" == "k10temp-pci-00c3" ]; then
 	processor=AMD
+elif [ "$hardware_identifier" == "w83793-i2c-1-2f" ]; then
+  processor=AMD
 else
 	echo "Error: cannot determine hardware sensor and what to search the /usr/bin/sensors output for to find the temperature"
 	exit $STATE_UNKNOWN
@@ -126,7 +128,7 @@ fi
 
 # sensors temperature outputs are different across the differing hardware types too
 # assumes sensors command outputs 'Core' (INTEL) or 'temp1' (AMD)
-# takes the 3rd charset of it for INTEL and 2nd charset for AMD and mangles through sed 
+# takes the 3rd charset of it for INTEL and 2nd charset for AMD and mangles through sed
 # to turn it into a whole number instead of something like +38.0°C
 # by removing the first char which is a + on systems I've tested, then
 # removing any chars ater a '.'
