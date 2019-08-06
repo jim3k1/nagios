@@ -113,6 +113,8 @@ elif [ "$hardware_identifier" == "fam15h_power-pci-00c4" ]; then
     processor=AMD
 elif [ "$hardware_identifier" == "k10temp-pci-00c3" ]; then
     processor=AMD
+elif [ "$hardware_identifier" == "k10temp-pci-00d3" ]; then
+    processor=AMD
 elif [ "$hardware_identifier" == "w83793-i2c-1-2f" ]; then
     processor=AMD
 elif [ "$hardware_identifier" == "i5k_amb-isa-0000" ]; then
@@ -128,15 +130,27 @@ fi
 # Detect Core temperatures #
 ############################
 
+declare -a temperatures
+
 if [ "$processor" == "INTEL" ]; then
     temperatures=($(/usr/bin/sensors | grep 'Core' | awk '{print $3}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//'))
 elif [ "$processor" == "AMD" ]; then
-    temperatures=$(/usr/bin/sensors | grep 'temp1' | awk '{print $2}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//')
+    temperatures=($(/usr/bin/sensors | grep 'temp1' | awk '{print $2}' | sed -n 's/+/&\n/;s/.*\n//p' | sed 's/\..*//'))
 fi
 
 if [ -z "$temperatures" ]; then
     echo "Error: temperature readings are null"
     exit $STATE_UNKNOWN
+fi
+
+highest=${temperatures[0]}
+
+if [ ${#temperatures[@]} -gt 1 ]; then
+    for tp in "${temperatures[@]}"; do
+        if [ $((tp)) -gt $((highest)) ]; then
+            highest=$tp
+        fi
+    done
 fi
 
 # sensors temperature outputs are different across the differing hardware types too
@@ -150,13 +164,11 @@ fi
 # Check temperatures against thresholds and act accordingly #
 #############################################################
 
-for coretemp in "${temperatures[@]}"; do
-    if [ $((coretemp)) -gt $((crittemp)) ]; then
-    critical $coretemp
-    elif [ $((coretemp)) -gt $((warningtemp)) ]; then
-    warn $coretemp
-    fi
-done
+if [ $((highest)) -gt $((crittemp)) ]; then
+    critical $highest
+elif [ $((highest)) -gt $((warningtemp)) ]; then
+    warn $highest
+fi
 
-echo "OK - Temperatures: ${temperatures[@]}"
+echo "OK - Temperatures: $highest"
 exit $STATE_OK
